@@ -1,0 +1,7 @@
+# Normalize to LF everywhere — Makefiles, shell scripts, and Docker builds
+# break on CRLF, and the repo is developed cross-platform.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary

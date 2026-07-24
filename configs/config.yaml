@@ -1,0 +1,79 @@
+# Strato default configuration (local development).
+# Every key is overridable via env var: STRATO_<SECTION>_<KEY>, e.g. STRATO_POSTGRES_HOST.
+
+server:
+  grpc_addr: ":9090"
+  http_addr: ":8080"
+  metrics_addr: ":9100"
+  shutdown_timeout: 20s
+  # TLS is terminated at the ingress/load balancer in production; enable here
+  # for direct TLS on the gRPC/HTTP listeners.
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+
+postgres:
+  host: localhost
+  port: 5432
+  user: strato
+  password: strato-dev-password
+  database: strato
+  ssl_mode: disable
+  max_conns: 32
+  min_conns: 4
+  max_conn_lifetime: 1h
+
+redis:
+  addr: localhost:6379
+  password: ""
+  db: 0
+
+s3:
+  endpoint: localhost:9000
+  access_key: strato-minio
+  secret_key: strato-minio-secret
+  bucket: strato-blobs
+  region: us-east-1
+  use_ssl: false
+  signed_url_ttl: 15m
+
+auth:
+  jwt_secret: dev-only-secret-do-not-use-in-prod
+  issuer: strato
+  access_token_ttl: 15m
+  refresh_token_ttl: 720h # 30 days
+
+encryption:
+  # base64-encoded 32-byte master key-encryption-key (KEK).
+  # Dev-only value; production must inject via secret manager.
+  master_key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
+upload:
+  chunk_size: 8388608        # 8 MiB
+  max_file_size: 10737418240 # 10 GiB
+  session_ttl: 24h
+  max_parallel_chunks: 8
+
+quota:
+  default_bytes: 10737418240 # 10 GiB per user
+
+rate_limit:
+  enabled: true
+  requests_per_minute: 300
+  auth_requests_per_minute: 20 # stricter for login/register
+
+worker:
+  gc_interval: 10m
+  pool_size: 8
+  trash_retention: 720h # soft-deleted files are purged after 30 days
+  orphan_grace: 24h     # zero-ref blobs younger than this are not GC'd
+
+telemetry:
+  service_name: strato
+  otlp_endpoint: "" # e.g. localhost:4317; empty disables tracing export
+  sample_ratio: 1.0
+
+log:
+  level: info # debug | info | warn | error
+  format: json # json | text

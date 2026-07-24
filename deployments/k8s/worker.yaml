@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: strato-worker
+  namespace: strato
+  labels:
+    app.kubernetes.io/name: strato
+    app.kubernetes.io/component: worker
+spec:
+  # GC sweeps are idempotent and batched; one replica is sufficient and
+  # avoids duplicate sweeps. Scale out only with sharded sweep keys.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: strato
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: strato
+        app.kubernetes.io/component: worker
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: ghcr.io/unisghimire/strato:latest
+          command: ["/app/worker", "--config", "/app/configs/config.yaml"]
+          envFrom:
+            - configMapRef: { name: strato-config }
+            - secretRef: { name: strato-secrets }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

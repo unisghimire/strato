@@ -1,0 +1,29 @@
+# Binaries
+/bin/
+*.exe
+*.test
+*.out
+
+# Generated protobuf code (regenerated via `make proto`)
+/proto/gen/
+
+# Environment & secrets
+.env
+*.pem
+*.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage.txt
+coverage.html
+
+# Local data volumes
+/docker/data/

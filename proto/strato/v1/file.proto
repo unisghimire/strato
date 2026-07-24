@@ -1,0 +1,328 @@
+syntax = "proto3";
+
+package strato.v1;
+
+import "google/api/annotations.proto";
+import "strato/v1/common.proto";
+
+option go_package = "github.com/unisghimire/strato/proto/gen/strato/v1;stratov1";
+
+// FileService manages file metadata, folders, versioning, and uploads.
+//
+// Byte transfer intentionally does NOT go through gRPC-gateway JSON:
+//   - chunk upload:   PUT  /v1/uploads/{session_id}/chunks/{index}  (raw body)
+//   - download:       GET  /v1/files/{file_id}/content              (streaming)
+// Those are raw HTTP handlers registered next to the gateway mux.
+service FileService {
+  // --- Upload lifecycle (chunked + resumable) ---
+
+  // InitUpload creates a resumable upload session and returns chunking
+  // parameters. Idempotent per (name, folder, checksum) while a session
+  // is active.
+  rpc InitUpload(InitUploadRequest) returns (InitUploadResponse) {
+    option (google.api.http) = {
+      post: "/v1/uploads"
+      body: "*"
+    };
+  }
+
+  // GetUploadStatus returns which chunks were received, enabling resume
+  // after a client crash without re-sending completed chunks.
+  rpc GetUploadStatus(GetUploadStatusRequest) returns (GetUploadStatusResponse) {
+    option (google.api.http) = {get: "/v1/uploads/{session_id}"};
+  }
+
+  // CompleteUpload assembles chunks, verifies the full-file checksum,
+  // deduplicates content, encrypts, and creates a new file version.
+  rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse) {
+    option (google.api.http) = {
+      post: "/v1/uploads/{session_id}/complete"
+      body: "*"
+    };
+  }
+
+  // AbortUpload cancels a session and garbage-collects its chunks.
+  rpc AbortUpload(AbortUploadRequest) returns (AbortUploadResponse) {
+    option (google.api.http) = {delete: "/v1/uploads/{session_id}"};
+  }
+
+  // --- File metadata ---
+
+  rpc GetFile(GetFileRequest) returns (GetFileResponse) {
+    option (google.api.http) = {get: "/v1/files/{file_id}"};
+  }
+
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse) {
+    option (google.api.http) = {get: "/v1/files"};
+  }
+
+  rpc SearchFiles(SearchFilesRequest) returns (SearchFilesResponse) {
+    option (google.api.http) = {get: "/v1/files:search"};
+  }
+
+  rpc MoveFile(MoveFileRequest) returns (MoveFileResponse) {
+    option (google.api.http) = {
+      post: "/v1/files/{file_id}:move"
+      body: "*"
+    };
+  }
+
+  rpc RenameFile(RenameFileRequest) returns (RenameFileResponse) {
+    option (google.api.http) = {
+      post: "/v1/files/{file_id}:rename"
+      body: "*"
+    };
+  }
+
+  // DeleteFile soft-deletes; content is retained until PurgeFile or GC policy.
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse) {
+    option (google.api.http) = {delete: "/v1/files/{file_id}"};
+  }
+
+  rpc RestoreFile(RestoreFileRequest) returns (RestoreFileResponse) {
+    option (google.api.http) = {
+      post: "/v1/files/{file_id}:restore"
+      body: "*"
+    };
+  }
+
+  // GetDownloadURL returns a short-lived signed URL for direct blob download,
+  // offloading bytes from the API tier. Encrypted blobs stream through the
+  // API instead (the server must decrypt).
+  rpc GetDownloadURL(GetDownloadURLRequest) returns (GetDownloadURLResponse) {
+    option (google.api.http) = {get: "/v1/files/{file_id}:downloadUrl"};
+  }
+
+  // --- Versioning ---
+
+  rpc ListVersions(ListVersionsRequest) returns (ListVersionsResponse) {
+    option (google.api.http) = {get: "/v1/files/{file_id}/versions"};
+  }
+
+  // RestoreVersion makes an old version current by appending a new version
+  // entry pointing at the old content. History is append-only.
+  rpc RestoreVersion(RestoreVersionRequest) returns (RestoreVersionResponse) {
+    option (google.api.http) = {
+      post: "/v1/files/{file_id}/versions/{version_id}:restore"
+      body: "*"
+    };
+  }
+
+  // --- Locking ---
+
+  rpc LockFile(LockFileRequest) returns (LockFileResponse) {
+    option (google.api.http) = {
+      post: "/v1/files/{file_id}:lock"
+      body: "*"
+    };
+  }
+
+  rpc UnlockFile(UnlockFileRequest) returns (UnlockFileResponse) {
+    option (google.api.http) = {
+      post: "/v1/files/{file_id}:unlock"
+      body: "*"
+    };
+  }
+
+  // --- Folders ---
+
+  rpc CreateFolder(CreateFolderRequest) returns (CreateFolderResponse) {
+    option (google.api.http) = {
+      post: "/v1/folders"
+      body: "*"
+    };
+  }
+
+  rpc ListFolder(ListFolderRequest) returns (ListFolderResponse) {
+    option (google.api.http) = {get: "/v1/folders/{folder_id}"};
+  }
+
+  rpc DeleteFolder(DeleteFolderRequest) returns (DeleteFolderResponse) {
+    option (google.api.http) = {delete: "/v1/folders/{folder_id}"};
+  }
+}
+
+// --- Upload messages ---
+
+message InitUploadRequest {
+  string name = 1;
+  // Empty folder_id targets the user's root.
+  string folder_id = 2;
+  string mime_type = 3;
+  int64 size_bytes = 4;
+  // Hex SHA-256 of the complete file; verified server-side on completion
+  // and used for deduplication.
+  string checksum_sha256 = 5;
+}
+
+message InitUploadResponse {
+  string session_id = 1;
+  int64 chunk_size = 2;
+  int32 total_chunks = 3;
+  // True when content already exists (dedup fast path): the client may call
+  // CompleteUpload immediately without sending any bytes.
+  bool already_exists = 4;
+}
+
+message GetUploadStatusRequest {
+  string session_id = 1;
+}
+
+message GetUploadStatusResponse {
+  string session_id = 1;
+  repeated int32 received_chunks = 2;
+  int32 total_chunks = 3;
+  string status = 4; // pending | completed | aborted | expired
+}
+
+message CompleteUploadRequest {
+  string session_id = 1;
+}
+
+message CompleteUploadResponse {
+  FileMetadata file = 1;
+}
+
+message AbortUploadRequest {
+  string session_id = 1;
+}
+
+message AbortUploadResponse {}
+
+// --- File messages ---
+
+message GetFileRequest {
+  string file_id = 1;
+}
+
+message GetFileResponse {
+  FileMetadata file = 1;
+}
+
+message ListFilesRequest {
+  string folder_id = 1;
+  bool include_deleted = 2;
+  PageRequest page = 3;
+  SortOrder order = 4;
+}
+
+message ListFilesResponse {
+  repeated FileMetadata files = 1;
+  PageResponse page = 2;
+}
+
+message SearchFilesRequest {
+  // Full-text query over file names.
+  string query = 1;
+  string mime_type = 2;
+  PageRequest page = 3;
+}
+
+message SearchFilesResponse {
+  repeated FileMetadata files = 1;
+  PageResponse page = 2;
+}
+
+message MoveFileRequest {
+  string file_id = 1;
+  string target_folder_id = 2;
+}
+
+message MoveFileResponse {
+  FileMetadata file = 1;
+}
+
+message RenameFileRequest {
+  string file_id = 1;
+  string new_name = 2;
+}
+
+message RenameFileResponse {
+  FileMetadata file = 1;
+}
+
+message DeleteFileRequest {
+  string file_id = 1;
+}
+
+message DeleteFileResponse {}
+
+message RestoreFileRequest {
+  string file_id = 1;
+}
+
+message RestoreFileResponse {
+  FileMetadata file = 1;
+}
+
+message GetDownloadURLRequest {
+  string file_id = 1;
+}
+
+message GetDownloadURLResponse {
+  string url = 1;
+  int64 expires_in_seconds = 2;
+}
+
+// --- Version messages ---
+
+message ListVersionsRequest {
+  string file_id = 1;
+  PageRequest page = 2;
+}
+
+message ListVersionsResponse {
+  repeated FileVersion versions = 1;
+  PageResponse page = 2;
+}
+
+message RestoreVersionRequest {
+  string file_id = 1;
+  string version_id = 2;
+}
+
+message RestoreVersionResponse {
+  FileMetadata file = 1;
+}
+
+// --- Lock messages ---
+
+message LockFileRequest {
+  string file_id = 1;
+}
+
+message LockFileResponse {}
+
+message UnlockFileRequest {
+  string file_id = 1;
+}
+
+message UnlockFileResponse {}
+
+// --- Folder messages ---
+
+message CreateFolderRequest {
+  string name = 1;
+  string parent_id = 2;
+}
+
+message CreateFolderResponse {
+  FolderMetadata folder = 1;
+}
+
+message ListFolderRequest {
+  string folder_id = 1;
+  PageRequest page = 2;
+}
+
+message ListFolderResponse {
+  repeated FolderMetadata folders = 1;
+  repeated FileMetadata files = 2;
+  PageResponse page = 3;
+}
+
+message DeleteFolderRequest {
+  string folder_id = 1;
+}
+
+message DeleteFolderResponse {}

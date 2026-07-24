@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package strato.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/unisghimire/strato/proto/gen/strato/v1;stratov1";
+
+// PageRequest is the standard cursor-based pagination input.
+// Cursor pagination (not offset) so listings stay O(log n) at millions of rows.
+message PageRequest {
+  // Maximum items to return. Server clamps to [1, 200]. Default 50.
+  int32 page_size = 1;
+  // Opaque cursor from a previous response. Empty means first page.
+  string page_token = 2;
+}
+
+// PageResponse accompanies every list response.
+message PageResponse {
+  // Cursor for the next page. Empty when there are no more results.
+  string next_page_token = 1;
+}
+
+// SortOrder for list endpoints.
+enum SortOrder {
+  SORT_ORDER_UNSPECIFIED = 0;
+  SORT_ORDER_ASC = 1;
+  SORT_ORDER_DESC = 2;
+}
+
+// FileMetadata is the canonical wire representation of a file.
+message FileMetadata {
+  string id = 1;
+  string name = 2;
+  string folder_id = 3;
+  string mime_type = 4;
+  int64 size_bytes = 5;
+  string checksum_sha256 = 6;
+  int32 version_number = 7;
+  bool is_deleted = 8;
+  bool is_locked = 9;
+  string locked_by_user_id = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Timestamp deleted_at = 13;
+}
+
+// FolderMetadata is the wire representation of a folder.
+message FolderMetadata {
+  string id = 1;
+  string name = 2;
+  string parent_id = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+// FileVersion is one immutable entry in a file's history.
+message FileVersion {
+  string id = 1;
+  string file_id = 2;
+  int32 version_number = 3;
+  int64 size_bytes = 4;
+  string checksum_sha256 = 5;
+  string created_by_user_id = 6;
+  google.protobuf.Timestamp created_at = 7;
+}

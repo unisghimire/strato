@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: strato-config
+  namespace: strato
+data:
+  # Non-secret configuration; secrets come from the strato-secrets Secret.
+  STRATO_POSTGRES_HOST: postgres.strato.svc.cluster.local
+  STRATO_POSTGRES_PORT: "5432"
+  STRATO_POSTGRES_USER: strato
+  STRATO_POSTGRES_DATABASE: strato
+  STRATO_POSTGRES_SSL_MODE: require
+  STRATO_REDIS_ADDR: redis.strato.svc.cluster.local:6379
+  STRATO_S3_ENDPOINT: minio.strato.svc.cluster.local:9000
+  STRATO_S3_BUCKET: strato-blobs
+  STRATO_S3_USE_SSL: "false"
+  STRATO_TELEMETRY_OTLP_ENDPOINT: otel-collector.observability.svc.cluster.local:4317
+  STRATO_LOG_LEVEL: info
+  STRATO_LOG_FORMAT: json

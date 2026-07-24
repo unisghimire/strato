@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.23"
+
+jobs:
+  proto:
+    name: Proto lint & generate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+      - name: Lint protos
+        run: buf lint
+      - name: Generate stubs
+        run: buf generate
+      - name: Upload generated code
+        uses: actions/upload-artifact@v4
+        with:
+          name: proto-gen
+          path: proto/gen
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    needs: proto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: proto-gen
+          path: proto/gen
+      - name: Sync modules
+        run: go mod tidy
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.61
+
+  test:
+    name: Unit tests & build
+    runs-on: ubuntu-latest
+    needs: proto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: proto-gen
+          path: proto/gen
+      - name: Sync modules
+        run: go mod tidy
+      - name: Build all binaries
+        run: |
+          go build ./cmd/server
+          go build ./cmd/worker
+          go build ./cmd/migrate
+      - name: Unit tests (race)
+        run: go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.txt
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: proto
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: strato
+          POSTGRES_PASSWORD: strato-dev-password
+          POSTGRES_DB: strato
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U strato"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: proto-gen
+          path: proto/gen
+      - name: Sync modules
+        run: go mod tidy
+      - name: Apply migrations
+        run: go run ./cmd/migrate --config "" --source file://migrations
+        env:
+          STRATO_POSTGRES_HOST: localhost
+          STRATO_POSTGRES_PORT: "5432"
+          STRATO_POSTGRES_USER: strato
+          STRATO_POSTGRES_PASSWORD: strato-dev-password
+          STRATO_POSTGRES_DATABASE: strato
+          STRATO_POSTGRES_SSL_MODE: disable
+          STRATO_AUTH_JWT_SECRET: ci-only-secret-at-least-32-chars!!
+          STRATO_ENCRYPTION_MASTER_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          STRATO_UPLOAD_CHUNK_SIZE: "8388608"
+      - name: Run integration tests
+        run: go test -race -count=1 -tags integration ./tests/integration/...
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f docker/Dockerfile -t strato:ci .

@@ -1,0 +1,330 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "strato/v1/share.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "ShareService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/shares": {
+      "get": {
+        "operationId": "ShareService_ListShares",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListSharesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "fileId",
+            "description": "Filter by file; empty lists all shares owned by the caller.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "page.pageSize",
+            "description": "Maximum items to return. Server clamps to [1, 200]. Default 50.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "page.pageToken",
+            "description": "Opaque cursor from a previous response. Empty means first page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ShareService"
+        ]
+      },
+      "post": {
+        "summary": "CreateShare grants a named user access to a file.",
+        "operationId": "ShareService_CreateShare",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1CreateShareResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateShareRequest"
+            }
+          }
+        ],
+        "tags": [
+          "ShareService"
+        ]
+      }
+    },
+    "/v1/shares/{shareId}": {
+      "delete": {
+        "operationId": "ShareService_RevokeShare",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1RevokeShareResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "shareId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ShareService"
+        ]
+      }
+    },
+    "/v1/shares:publicLink": {
+      "post": {
+        "summary": "CreatePublicLink creates a tokenized link, optionally expiring and/or\npassword-protected.",
+        "operationId": "ShareService_CreatePublicLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1CreatePublicLinkResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreatePublicLinkRequest"
+            }
+          }
+        ],
+        "tags": [
+          "ShareService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1CreatePublicLinkRequest": {
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "string"
+        },
+        "permission": {
+          "$ref": "#/definitions/v1Permission"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "password": {
+          "type": "string",
+          "description": "Optional password gate for the link."
+        }
+      }
+    },
+    "v1CreatePublicLinkResponse": {
+      "type": "object",
+      "properties": {
+        "share": {
+          "$ref": "#/definitions/v1Share"
+        }
+      }
+    },
+    "v1CreateShareRequest": {
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "string"
+        },
+        "granteeEmail": {
+          "type": "string"
+        },
+        "permission": {
+          "$ref": "#/definitions/v1Permission"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "v1CreateShareResponse": {
+      "type": "object",
+      "properties": {
+        "share": {
+          "$ref": "#/definitions/v1Share"
+        }
+      }
+    },
+    "v1ListSharesResponse": {
+      "type": "object",
+      "properties": {
+        "shares": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Share"
+          }
+        },
+        "page": {
+          "$ref": "#/definitions/v1PageResponse"
+        }
+      }
+    },
+    "v1PageRequest": {
+      "type": "object",
+      "properties": {
+        "pageSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Maximum items to return. Server clamps to [1, 200]. Default 50."
+        },
+        "pageToken": {
+          "type": "string",
+          "description": "Opaque cursor from a previous response. Empty means first page."
+        }
+      },
+      "description": "PageRequest is the standard cursor-based pagination input.\nCursor pagination (not offset) so listings stay O(log n) at millions of rows."
+    },
+    "v1PageResponse": {
+      "type": "object",
+      "properties": {
+        "nextPageToken": {
+          "type": "string",
+          "description": "Cursor for the next page. Empty when there are no more results."
+        }
+      },
+      "description": "PageResponse accompanies every list response."
+    },
+    "v1Permission": {
+      "type": "string",
+      "enum": [
+        "PERMISSION_UNSPECIFIED",
+        "PERMISSION_VIEWER",
+        "PERMISSION_EDITOR",
+        "PERMISSION_OWNER"
+      ],
+      "default": "PERMISSION_UNSPECIFIED",
+      "description": "Permission granted by a share.\n\n - PERMISSION_VIEWER: read metadata + download\n - PERMISSION_EDITOR: viewer + upload new versions\n - PERMISSION_OWNER: editor + reshare + delete"
+    },
+    "v1RevokeShareResponse": {
+      "type": "object"
+    },
+    "v1Share": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "fileId": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        },
+        "granteeEmail": {
+          "type": "string",
+          "description": "Set for private shares."
+        },
+        "publicUrl": {
+          "type": "string",
+          "description": "Set for public links (never both)."
+        },
+        "permission": {
+          "$ref": "#/definitions/v1Permission"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

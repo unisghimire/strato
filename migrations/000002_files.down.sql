@@ -1,0 +1,5 @@
+ALTER TABLE files DROP CONSTRAINT IF EXISTS files_current_version_fk;
+DROP TABLE IF EXISTS file_versions;
+DROP TABLE IF EXISTS files;
+DROP TABLE IF EXISTS blobs;
+DROP TABLE IF EXISTS folders;

@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package strato.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "strato/v1/common.proto";
+
+option go_package = "github.com/unisghimire/strato/proto/gen/strato/v1;stratov1";
+
+// ShareService manages private grants and public links.
+// Public link content is served by a raw HTTP handler:
+//   GET /public/{token}  (optionally ?password=...)
+service ShareService {
+  // CreateShare grants a named user access to a file.
+  rpc CreateShare(CreateShareRequest) returns (CreateShareResponse) {
+    option (google.api.http) = {
+      post: "/v1/shares"
+      body: "*"
+    };
+  }
+
+  // CreatePublicLink creates a tokenized link, optionally expiring and/or
+  // password-protected.
+  rpc CreatePublicLink(CreatePublicLinkRequest) returns (CreatePublicLinkResponse) {
+    option (google.api.http) = {
+      post: "/v1/shares:publicLink"
+      body: "*"
+    };
+  }
+
+  rpc ListShares(ListSharesRequest) returns (ListSharesResponse) {
+    option (google.api.http) = {get: "/v1/shares"};
+  }
+
+  rpc RevokeShare(RevokeShareRequest) returns (RevokeShareResponse) {
+    option (google.api.http) = {delete: "/v1/shares/{share_id}"};
+  }
+}
+
+// Permission granted by a share.
+enum Permission {
+  PERMISSION_UNSPECIFIED = 0;
+  PERMISSION_VIEWER = 1; // read metadata + download
+  PERMISSION_EDITOR = 2; // viewer + upload new versions
+  PERMISSION_OWNER = 3;  // editor + reshare + delete
+}
+
+message Share {
+  string id = 1;
+  string file_id = 2;
+  string owner_id = 3;
+  // Set for private shares.
+  string grantee_email = 4;
+  // Set for public links (never both).
+  string public_url = 5;
+  Permission permission = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message CreateShareRequest {
+  string file_id = 1;
+  string grantee_email = 2;
+  Permission permission = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message CreateShareResponse {
+  Share share = 1;
+}
+
+message CreatePublicLinkRequest {
+  string file_id = 1;
+  Permission permission = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  // Optional password gate for the link.
+  string password = 4;
+}
+
+message CreatePublicLinkResponse {
+  Share share = 1;
+}
+
+message ListSharesRequest {
+  // Filter by file; empty lists all shares owned by the caller.
+  string file_id = 1;
+  PageRequest page = 2;
+}
+
+message ListSharesResponse {
+  repeated Share shares = 1;
+  PageResponse page = 2;
+}
+
+message RevokeShareRequest {
+  string share_id = 1;
+}
+
+message RevokeShareResponse {}
