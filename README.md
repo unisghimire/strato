@@ -24,26 +24,26 @@
 ```mermaid
 flowchart LR
     subgraph Clients
-        C1[Web / CLI / SDK]
+        C1["Web / CLI / SDK"]
     end
 
-    subgraph API tier — stateless, horizontally scaled
-        GW[REST Gateway :8080\ngrpc-gateway + raw byte endpoints]
-        G[gRPC :9090\nAuth · File · Share services]
+    subgraph API["API tier (stateless, horizontally scaled)"]
+        GW["REST Gateway :8080<br/>grpc-gateway + raw byte endpoints"]
+        G["gRPC :9090<br/>Auth, File, Share services"]
         GW -->|loopback gRPC| G
     end
 
-    subgraph Use cases
-        UC[auth · upload · file · share\nsingle authorization gate]
+    subgraph UCG["Use cases"]
+        UC["auth, upload, file, share<br/>single authorization gate"]
     end
 
-    subgraph Infrastructure
-        PG[(PostgreSQL\nmetadata · versions · sessions)]
-        RD[(Redis\nrate limits · distributed locks)]
-        S3[(MinIO / S3\nencrypted blobs · staging chunks)]
+    subgraph Infra["Infrastructure"]
+        PG[("PostgreSQL<br/>metadata, versions, sessions")]
+        RD[("Redis<br/>rate limits, distributed locks")]
+        S3[("MinIO / S3<br/>encrypted blobs, staging chunks")]
     end
 
-    W[GC Worker\nexpired uploads · trash purge · orphan blobs]
+    W["GC Worker<br/>expired uploads, trash purge, orphan blobs"]
 
     C1 -->|HTTPS| GW
     C1 -->|gRPC/TLS| G
@@ -71,16 +71,16 @@ sequenceDiagram
     A-->>C: session_id, chunk_size (already_exists? skip to Complete)
     par parallel chunks
         C->>A: PUT /uploads/{id}/chunks/0 (raw bytes)
-        A->>M: stream → staging/0 (hash on the fly)
+        A->>M: stream to staging/0 (hash on the fly)
         A->>P: chunk receipt
     and
         C->>A: PUT /uploads/{id}/chunks/N
-        A->>M: stream → staging/N
+        A->>M: stream to staging/N
         A->>P: chunk receipt
     end
     C->>A: CompleteUpload(session_id)
-    A->>A: distributed lock; verify all receipts
-    A->>M: read chunks → SHA-256 + AES-GCM encrypt → blobs/<sha>
+    A->>A: distributed lock, verify all receipts
+    A->>M: read chunks, SHA-256 + AES-GCM encrypt, write blobs/sha
     A->>P: TX: blob row + version + refcount + quota (atomic)
     A->>M: delete staging
     A-->>C: FileMetadata (version N)
