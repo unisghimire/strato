@@ -4,7 +4,7 @@
 # --- Stage 1: protobuf codegen ---
 FROM bufbuild/buf:1.47.2 AS proto
 WORKDIR /src
-COPY buf.yaml buf.gen.yaml ./
+COPY buf.yaml buf.gen.yaml buf.lock ./
 COPY proto/ proto/
 RUN buf generate
 

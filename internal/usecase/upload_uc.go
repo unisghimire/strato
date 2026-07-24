@@ -160,7 +160,9 @@ func (u *UploadUseCase) UploadChunk(ctx context.Context, ident *domain.Identity,
 	// Put reads exactly `expected` bytes; a short body fails inside Put, so
 	// undersized chunks never produce a receipt.
 	if err := u.store.Put(ctx, key, io.TeeReader(io.LimitReader(body, expected), hasher), expected, "application/octet-stream"); err != nil {
-		return nil, fmt.Errorf("%w: chunk %d rejected (wrong size or transfer error): %v", domain.ErrInvalidArgument, index, err)
+		// The infra error is context only — deliberately %v, not %w, so it
+		// never joins the domain error chain callers match on.
+		return nil, fmt.Errorf("%w: chunk %d rejected (wrong size or transfer error): %v", domain.ErrInvalidArgument, index, err) //nolint:errorlint
 	}
 	chunk := &entity.Chunk{
 		SessionID:      sess.ID,

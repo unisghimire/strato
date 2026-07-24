@@ -70,7 +70,7 @@ func (u *FileUseCase) Get(ctx context.Context, ident *domain.Identity, fileID uu
 // List pages the caller's own files in a folder.
 func (u *FileUseCase) List(ctx context.Context, ident *domain.Identity, folderID *uuid.UUID, includeDeleted, descending bool, cur pagination.Cursor, limit int) ([]*entity.File, error) {
 	if folderID != nil {
-		if _, err := u.ownFolder(ctx, ident, *folderID); err != nil {
+		if err := u.ownFolder(ctx, ident, *folderID); err != nil {
 			return nil, err
 		}
 	}
@@ -258,7 +258,7 @@ func (u *FileUseCase) CreateFolder(ctx context.Context, ident *domain.Identity, 
 		return nil, err
 	}
 	if parentID != nil {
-		if _, err := u.ownFolder(ctx, ident, *parentID); err != nil {
+		if err := u.ownFolder(ctx, ident, *parentID); err != nil {
 			return nil, err
 		}
 	}
@@ -274,7 +274,7 @@ func (u *FileUseCase) CreateFolder(ctx context.Context, ident *domain.Identity, 
 // cursor.
 func (u *FileUseCase) ListFolder(ctx context.Context, ident *domain.Identity, folderID *uuid.UUID, cur pagination.Cursor, limit int) ([]*entity.Folder, []*entity.File, error) {
 	if folderID != nil {
-		if _, err := u.ownFolder(ctx, ident, *folderID); err != nil {
+		if err := u.ownFolder(ctx, ident, *folderID); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -293,7 +293,7 @@ func (u *FileUseCase) ListFolder(ctx context.Context, ident *domain.Identity, fo
 // rather than recursively deleted — recursive delete is an easy footgun and
 // a deliberate non-feature at this layer.
 func (u *FileUseCase) DeleteFolder(ctx context.Context, ident *domain.Identity, folderID uuid.UUID) error {
-	if _, err := u.ownFolder(ctx, ident, folderID); err != nil {
+	if err := u.ownFolder(ctx, ident, folderID); err != nil {
 		return err
 	}
 	hasChildren, err := u.folders.HasChildren(ctx, folderID)
@@ -395,13 +395,14 @@ func (u *FileUseCase) mutableFile(ctx context.Context, ident *domain.Identity, f
 	return f, nil
 }
 
-// ownFolder resolves a folder and hides other users' folders as not-found.
-func (u *FileUseCase) ownFolder(ctx context.Context, ident *domain.Identity, folderID uuid.UUID) (*entity.Folder, error) {
+// ownFolder verifies the folder exists and belongs to the caller, hiding
+// other users' folders as not-found.
+func (u *FileUseCase) ownFolder(ctx context.Context, ident *domain.Identity, folderID uuid.UUID) error {
 	folder, err := u.folders.GetByID(ctx, folderID)
 	if err != nil || folder.OwnerID != ident.UserID {
-		return nil, domain.ErrNotFound
+		return domain.ErrNotFound
 	}
-	return folder, nil
+	return nil
 }
 
 // readCloser pairs a decrypting reader with the underlying object handle.

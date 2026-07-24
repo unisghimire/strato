@@ -280,12 +280,12 @@ func EncryptedSize(n int64, segmentSize int) int64 {
 	fullSegs := n / int64(segmentSize)
 	rem := n % int64(segmentSize)
 	overhead := int64(16) // GCM tag
-	// Every stream has exactly one final segment (possibly empty).
+	// Every stream has exactly one final segment (possibly empty). When n is
+	// an exact multiple of the segment size, the last full segment becomes
+	// the final one; otherwise the remainder (or an empty payload) does.
 	segs := fullSegs
 	if rem > 0 || fullSegs == 0 {
 		segs++
-	} else {
-		// n is an exact multiple: last full segment becomes the final one.
 	}
 	return int64(magicLen+noncePrefixLen) + segs*int64(segHeaderLen) + segs*overhead + n
 }

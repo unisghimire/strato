@@ -16,7 +16,7 @@ const (
 	AuditUserLogin       AuditAction = "user.login"
 	AuditUserLoginFailed AuditAction = "user.login_failed"
 	AuditUserLogout      AuditAction = "user.logout"
-	AuditTokenReuse      AuditAction = "auth.token_reuse_detected"
+	AuditTokenReuse      AuditAction = "auth.token_reuse_detected" //nolint:gosec // action name, not a credential
 	AuditFileUploaded    AuditAction = "file.uploaded"
 	AuditFileDownloaded  AuditAction = "file.downloaded"
 	AuditFileDeleted     AuditAction = "file.deleted"
